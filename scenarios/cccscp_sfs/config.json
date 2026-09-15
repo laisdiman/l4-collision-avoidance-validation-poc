@@ -1,0 +1,7 @@
+{
+  "name": "CCCscp SfS",
+  "description": "Car-to-Car Crossing Start-from-Stop",
+  "analyzer": "sfs",
+  "version": "1.0",
+  "protocol": "Euro NCAP CA 102"
+}

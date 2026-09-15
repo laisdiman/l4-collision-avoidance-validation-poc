@@ -1,0 +1,31 @@
+esmini GIT REV: v3.7.2-0-4b8fbafb
+esmini GIT TAG: v3.7.2
+esmini GIT BRANCH: tags/v3.7.2^0
+esmini BUILD VERSION: 6360
+[] [info] Loaded config file: C:\esmini\esmini-demo\config.yml (C:\esmini\esmini-demo\bin\..\config.yml)
+[] [info] Loaded C:\Users\laisd\OneDrive\Documentos\l4-collision-avoidance-validation-poc\scenarios\cccscp_sfs\CCCscp_SfS.xosc
+[2026-09-10 17:55:02]
+[] [info] Player options: --osc C:\Users\laisd\OneDrive\Documentos\l4-collision-avoidance-validation-poc\scenarios\cccscp_sfs\CCCscp_SfS.xosc --camera_mode orbit --csv_logger C:\Users\laisd\OneDrive\Documentos\l4-collision-avoidance-validation-poc\scenarios\cccscp_sfs\reference_data\base_run.csv --fixed_timestep 0.01 --ground_plane auto --headless --info_text 1 --logfile_path log.txt --log_level info --text_scale 1.0 --traj_filter 0.1 --light_mode auto 
+[] [info] Run simulation decoupled from realtime, with fixed timestep: 0.01
+[] [info] Generated seed 1091598864
+[] [info] Loading C:/Users/laisd/OneDrive/Documentos/l4-collision-avoidance-validation-poc/scenarios/cccscp_sfs/CCCscp_SfS.xosc (v1.3)
+[] [info] Expr ${$GVT_speed_kph/3.6} = 20/3.6 = 5.5555555556
+[] [info] Expr ${$Ego_BBcenter_x+($Ego_length/2)} = 1.349+(4.358/2) = 3.5280000000
+[] [info] Expr ${$Target_BBcenter_x+($Target_length/2)} = 1.328+(4.023/2) = 3.3395000000
+[] [info] Expr ${$Road_armLength+$IntersectionLength/2-$ImpactSide*$Road_laneWidth/2-$_Ego_frontBumperLon-$Target_width/2} = 250+23/2-1*3.5/2-3.528000-1.712/2 = 255.3660000000
+[] [info] Expr ${$_Ego_syncS-$Ego_initDistance} = 255.366000-2.9 = 252.4660000000
+[] [info] Expr ${$Road_armLength+$IntersectionLength/2+$ImpactSide*$Road_laneWidth/2-$_Target_frontBumperLon+$Target_length/4} = 250+23/2+1*3.5/2-3.339500+4.023/4 = 260.9162500000
+[] [info] Expr ${$_Target_syncS-$_GVT_speed*$T_End} = 260.916250-5.555556*2.67 = 246.0829154800
+[] [info] 1 variables:
+[] [info]    collisionDetected = false
+[] [info] OpenDRIVE file search paths attempted for file X-Intersection_NCAP.xodr:
+[] [info]   ../../../OpenDRIVE/NCAP/X-Intersection_NCAP.xodr
+[] [info]   X-Intersection_NCAP.xodr
+[] [info]   C:/Users/laisd/OneDrive/Documentos/l4-collision-avoidance-validation-poc/scenarios/cccscp_sfs/../../../OpenDRIVE/NCAP/X-Intersection_NCAP.xodr
+[] [info]   C:/Users/laisd/OneDrive/Documentos/l4-collision-avoidance-validation-poc/scenarios/cccscp_sfs/./X-Intersection_NCAP.xodr
+[] [info]   C:\esmini\esmini-demo\bin/../resources/xodr/../../../OpenDRIVE/NCAP/X-Intersection_NCAP.xodr
+[] [info]   C:\esmini\esmini-demo\bin/../resources/xodr/./X-Intersection_NCAP.xodr
+[] [warn] OpenDRIVE file ../../../OpenDRIVE/NCAP/X-Intersection_NCAP.xodr not located, using specified file path
+[] [error] Failed to locate OpenDRIVE file ../../../OpenDRIVE/NCAP/X-Intersection_NCAP.xodr
+[] [error] Exception: [] [error] Failed to locate OpenDRIVE file ../../../OpenDRIVE/NCAP/X-Intersection_NCAP.xodr
+

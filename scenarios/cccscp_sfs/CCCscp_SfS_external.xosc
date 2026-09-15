@@ -1,0 +1,377 @@
+<?xml version='1.0' encoding='utf-8'?>
+<OpenSCENARIO xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="OpenSCENARIO.xsd">
+  <!--
+    CCCscp SfS - Car-to-Car Crossing, Straight Crossing Path, Start-from-Stop.
+
+    Modelled after the Euro NCAP Crash Avoidance Frontal Collisions protocol
+    section 3.1.1 and Technical Bulletin CA 102 section 2.3.
+
+      VUT : initially stationary, front bumper 2.9 m from the impact point,
+            then drives away on a CA 102 compliant acceleration profile.
+      GVT : constant test speed, crossing from the farside, perpendicular,
+            positioned so that it reaches the impact point as the VUT does.
+      Impact : front of VUT against GVT reference point, 50% of VUT width.
+
+    Sweep variable is GVT speed (20/30/40/50/60 km/h) per the protocol matrix.
+    The VUT configuration does not change between runs.
+
+    MODELLING NOTES (deviations to be recorded in the test report)
+      1. CA 102 specifies an accelerator PEDAL profile determined iteratively
+         on the real vehicle. Here the resulting longitudinal acceleration is
+         commanded directly, as a two-phase approximation:
+            phase 1  1.0 m/s^2  until 0.5 m/s   (a <= 1.0 before T_Start+0.5 s)
+            phase 2  1.4 m/s^2  thereafter      (1.0 < a <= 1.75, holds to T_End)
+         This satisfies the CA 102 acceleration corridor but is not a pedal
+         model.
+      2. In the physical test T_Avg is measured over >=3 drive-away trials and
+         used to trigger the GVT. Here T_End is known analytically (2.166 s),
+         so the GVT is placed at speed x T_End from the impact point.
+      3. No obstruction vehicles: protocol Figure 3-1 shows none.
+
+    Road network and catalogues are those of the Vector NCAP scenario set
+    (github.com/vectorgrp/OSC-NCAP-scenarios, MPL-2.0).
+  -->
+  <FileHeader revMajor="1" revMinor="3" date="2026-09-09T00:00:00"
+              author="[Your Name]"
+              description="CCCscp SfS - external Python collision-avoidance controller variant"/>
+
+  <ParameterDeclarations>
+    <!-- ============ sweep variable ============ -->
+    <ParameterDeclaration name="GVT_speed_kph" parameterType="double" value="20">
+      <!--protocol matrix: 20, 30, 40, 50, 60 km/h-->
+      <ConstraintGroup>
+        <ValueConstraint rule="greaterThan" value="0"/>
+      </ConstraintGroup>
+    </ParameterDeclaration>
+
+    <!-- ============ VUT ============ -->
+    <ParameterDeclaration name="Ego_length"      parameterType="double" value="4.358"/>
+    <ParameterDeclaration name="Ego_width"       parameterType="double" value="1.815"/>
+    <ParameterDeclaration name="Ego_BBcenter_x"  parameterType="double" value="1.349"/>
+    <ParameterDeclaration name="Ego_initDistance" parameterType="double" value="2.9">
+      <!--protocol: initial longitudinal distance from VUT front to impact point-->
+    </ParameterDeclaration>
+
+    <!-- CA 102 section 2.3 acceleration corridor -->
+    <ParameterDeclaration name="Accel_phase1"      parameterType="double" value="1.0"/>
+    <ParameterDeclaration name="Accel_phase1_speed" parameterType="double" value="0.5"/>
+    <ParameterDeclaration name="Accel_phase2"      parameterType="double" value="1.4"/>
+    <ParameterDeclaration name="Accel_targetSpeed" parameterType="double" value="8.0">
+      <!--not reached before the impact point; phase 2 simply keeps accelerating-->
+    </ParameterDeclaration>
+
+    <!-- ============ GVT ============ -->
+    <ParameterDeclaration name="Target_catalogName"  parameterType="string" value="Vehicles"/>
+    <ParameterDeclaration name="Target_catalogEntry" parameterType="string" value="NCAP_GlobalVehicleTarget"/>
+    <ParameterDeclaration name="Target_width"        parameterType="double" value="1.712"/>
+    <ParameterDeclaration name="Target_length"       parameterType="double" value="4.023"/>
+    <ParameterDeclaration name="Target_BBcenter_x"   parameterType="double" value="1.328"/>
+    <ParameterDeclaration name="Target_trajectory"   parameterType="string" value="X-IntersectionTrajectory_Farside"/>
+
+    <!-- ============ external controller parameters ============ -->
+    <!-- The Python controller reads these values through esminiLib. -->
+    <ParameterDeclaration name="ExternalControllerMaxDecel"    parameterType="double" value="6.0"/>
+    <ParameterDeclaration name="ExternalControllerMaxAccel"    parameterType="double" value="1.4"/>
+    <ParameterDeclaration name="ExternalControllerConflictGap" parameterType="double" value="0.75"/>
+    <ParameterDeclaration name="ExternalControllerControlPeriod" parameterType="double" value="0.01"/>
+    <!-- Reference-point conflict coordinates calibrated from the baseline
+         contact sample; the vehicle bounding boxes create the actual overlap. -->
+    <ParameterDeclaration name="ExternalControllerConflictX"   parameterType="double" value="255.366"/>
+    <ParameterDeclaration name="ExternalControllerConflictY"   parameterType="double" value="0.50"/>
+
+    <!-- ============ road ============ -->
+    <ParameterDeclaration name="Road_armLength"      parameterType="double" value="250"/>
+    <ParameterDeclaration name="Road_laneWidth"      parameterType="double" value="3.5"/>
+    <ParameterDeclaration name="IntersectionLength"  parameterType="double" value="23"/>
+    <ParameterDeclaration name="ImpactSide"          parameterType="int"    value="1">
+      <!--1 = farside (per protocol), -1 = nearside-->
+    </ParameterDeclaration>
+    <ParameterDeclaration name="Scenario_ID"         parameterType="string" value="CCCscp_SfS"/>
+
+    <!-- ============ derived ============ -->
+    <ParameterDeclaration name="_GVT_speed" parameterType="double" value="${$GVT_speed_kph/3.6}"/>
+    <ParameterDeclaration name="_Ego_frontBumperLon" parameterType="double"
+                          value="${$Ego_BBcenter_x+($Ego_length/2)}"/>
+    <ParameterDeclaration name="_Target_frontBumperLon" parameterType="double"
+                          value="${$Target_BBcenter_x+($Target_length/2)}"/>
+
+    <!-- VUT reference-point s at the instant its front bumper is at the impact point -->
+    <ParameterDeclaration name="_Ego_syncS" parameterType="double"
+      value="${$Road_armLength+$IntersectionLength/2-$ImpactSide*$Road_laneWidth/2-$_Ego_frontBumperLon-$Target_width/2}"/>
+    <!-- VUT start: 2.9 m short of that -->
+    <ParameterDeclaration name="_Ego_initS" parameterType="double"
+      value="${$_Ego_syncS-$Ego_initDistance}"/>
+
+    <!-- GVT reference-point s at impact -->
+    <ParameterDeclaration name="_Target_syncS" parameterType="double"
+      value="${$Road_armLength+$IntersectionLength/2+$ImpactSide*$Road_laneWidth/2-$_Target_frontBumperLon+$Target_length/4}"/>
+
+    <!-- Time for the VUT to cover 2.9 m on the two-phase profile.
+         Analytic for the default profile; recompute if the profile is changed. -->
+    <ParameterDeclaration name="T_End" parameterType="double" value="2.67"/>
+
+    <!-- GVT starts T_End worth of travel back from its sync point, at constant
+         speed, so both reach the impact point together. -->
+    <ParameterDeclaration name="_Target_initS" parameterType="double"
+      value="${$_Target_syncS-$_GVT_speed*$T_End}">
+      <ConstraintGroup>
+        <ValueConstraint rule="greaterThan" value="0"/>
+      </ConstraintGroup>
+    </ParameterDeclaration>
+  </ParameterDeclarations>
+
+  <VariableDeclarations>
+    <VariableDeclaration name="collisionDetected" variableType="boolean" value="false"/>
+  </VariableDeclarations>
+
+  <CatalogLocations>
+    <VehicleCatalog><Directory path="../Catalogs/Vehicles"/></VehicleCatalog>
+    <PedestrianCatalog><Directory path="../Catalogs/Pedestrians"/></PedestrianCatalog>
+    <TrajectoryCatalog><Directory path="../Catalogs/Trajectories"/></TrajectoryCatalog>
+    <RouteCatalog><Directory path="../Catalogs/Routes"/></RouteCatalog>
+    <ManeuverCatalog><Directory path="../Catalogs/Maneuver"/></ManeuverCatalog>
+    <EnvironmentCatalog><Directory path="../Catalogs/Environments"/></EnvironmentCatalog>
+  </CatalogLocations>
+
+  <RoadNetwork>
+    <LogicFile filepath="../../OpenDRIVE/NCAP/X-Intersection_NCAP.xodr"/>
+  </RoadNetwork>
+
+  <Entities>
+    <ScenarioObject name="Ego">
+      <CatalogReference entryName="VW_Golf_Sportsvan_2015" catalogName="Vehicles"/>
+      <ObjectController>
+        <Controller name="ExternalEgoController">
+          <Properties>
+            <Property name="esminiController" value="ExternalController"/>
+          </Properties>
+        </Controller>
+      </ObjectController>
+    </ScenarioObject>
+    <ScenarioObject name="Target">
+      <CatalogReference entryName="$Target_catalogEntry" catalogName="$Target_catalogName"/>
+    </ScenarioObject>
+  </Entities>
+
+  <Storyboard>
+    <Init>
+      <Actions>
+        <GlobalAction>
+          <EnvironmentAction>
+            <CatalogReference catalogName="Environments" entryName="Sunny"/>
+          </EnvironmentAction>
+        </GlobalAction>
+
+        <!-- VUT: stationary at the stop position -->
+        <Private entityRef="Ego">
+          <PrivateAction>
+            <LongitudinalAction>
+              <SpeedAction>
+                <SpeedActionDynamics dynamicsDimension="time" dynamicsShape="step" value="0"/>
+                <SpeedActionTarget><AbsoluteTargetSpeed value="0"/></SpeedActionTarget>
+              </SpeedAction>
+            </LongitudinalAction>
+          </PrivateAction>
+          <PrivateAction>
+            <RoutingAction>
+              <FollowTrajectoryAction initialDistanceOffset="$_Ego_initS">
+                <TimeReference><None/></TimeReference>
+                <TrajectoryFollowingMode followingMode="follow"/>
+                <TrajectoryRef>
+                  <CatalogReference catalogName="TrajectoryCatalog" entryName="Ego_CxCscp"/>
+                </TrajectoryRef>
+              </FollowTrajectoryAction>
+            </RoutingAction>
+          </PrivateAction>
+          <!-- After initialization, Python owns Ego's longitudinal/lateral state. -->
+          <PrivateAction>
+            <ControllerAction>
+              <ActivateControllerAction longitudinal="true" lateral="true"/>
+            </ControllerAction>
+          </PrivateAction>
+        </Private>
+
+        <!-- GVT: already at test speed, steady state throughout -->
+        <Private entityRef="Target">
+          <PrivateAction>
+            <LongitudinalAction>
+              <SpeedAction>
+                <SpeedActionDynamics dynamicsDimension="time" dynamicsShape="step" value="0"/>
+                <SpeedActionTarget><AbsoluteTargetSpeed value="$_GVT_speed"/></SpeedActionTarget>
+              </SpeedAction>
+            </LongitudinalAction>
+          </PrivateAction>
+          <PrivateAction>
+            <RoutingAction>
+              <FollowTrajectoryAction initialDistanceOffset="$_Target_initS">
+                <TimeReference><None/></TimeReference>
+                <TrajectoryFollowingMode followingMode="follow"/>
+                <TrajectoryRef>
+                  <CatalogReference catalogName="TrajectoryCatalog" entryName="$Target_trajectory"/>
+                </TrajectoryRef>
+              </FollowTrajectoryAction>
+            </RoutingAction>
+          </PrivateAction>
+        </Private>
+      </Actions>
+    </Init>
+
+    <Story name="NCAP_CA-FC_CCCscp_SfS">
+      <Act name="DriveAway_Act">
+        <ManeuverGroup name="VUT_DriveAway" maximumExecutionCount="1">
+          <Actors selectTriggeringEntities="false">
+            <EntityRef entityRef="Ego"/>
+          </Actors>
+          <Maneuver name="CA102_AccelerationProfile">
+
+            <!-- phase 1: <= 1.0 m/s^2 until T_Start + 0.5 s -->
+            <Event name="Accel_Phase1" maximumExecutionCount="1" priority="override">
+              <Action name="Phase1_Action">
+                <PrivateAction>
+                  <LongitudinalAction>
+                    <SpeedAction>
+                      <SpeedActionDynamics dynamicsShape="linear"
+                                           dynamicsDimension="rate"
+                                           value="$Accel_phase1"/>
+                      <SpeedActionTarget>
+                        <AbsoluteTargetSpeed value="$Accel_phase1_speed"/>
+                      </SpeedActionTarget>
+                    </SpeedAction>
+                  </LongitudinalAction>
+                </PrivateAction>
+              </Action>
+              <StartTrigger>
+                <ConditionGroup>
+                  <Condition name="Phase1_done" delay="0" conditionEdge="rising">
+                    <ByValueCondition>
+                      <SimulationTimeCondition value="0.5" rule="greaterThan"/>
+                    </ByValueCondition>
+                  </Condition>
+                </ConditionGroup>
+              </StartTrigger>
+            </Event>
+
+            <!-- phase 2: > 1.0 and <= 1.75 m/s^2 through to the impact point -->
+            <Event name="Accel_Phase2" maximumExecutionCount="1" priority="overwrite">
+              <Action name="Phase2_Action">
+                <PrivateAction>
+                  <LongitudinalAction>
+                    <SpeedAction>
+                      <SpeedActionDynamics dynamicsShape="linear"
+                                           dynamicsDimension="rate"
+                                           value="$Accel_phase2"/>
+                      <SpeedActionTarget>
+                        <AbsoluteTargetSpeed value="$Accel_targetSpeed"/>
+                      </SpeedActionTarget>
+                    </SpeedAction>
+                  </LongitudinalAction>
+                </PrivateAction>
+              </Action>
+              <StartTrigger>
+                <ConditionGroup>
+                  <Condition name="Phase1_complete" delay="0" conditionEdge="none">
+                    <ByValueCondition>
+                      <StoryboardElementStateCondition
+                        storyboardElementType="action"
+                        storyboardElementRef="Phase1_Action"
+                        state="completeState"/>
+                    </ByValueCondition>
+                  </Condition>
+                </ConditionGroup>
+              </StartTrigger>
+            </Event>
+
+          </Maneuver>
+        </ManeuverGroup>
+        <StartTrigger>
+          <ConditionGroup>
+            <Condition name="SimulationStart" delay="0" conditionEdge="rising">
+              <ByValueCondition>
+                <SimulationTimeCondition value="0" rule="greaterThan"/>
+              </ByValueCondition>
+            </Condition>
+          </ConditionGroup>
+        </StartTrigger>
+      </Act>
+
+      <Act name="Collision_Act">
+        <ManeuverGroup name="CollisionDetection" maximumExecutionCount="1">
+          <Actors selectTriggeringEntities="false">
+            <EntityRef entityRef="Ego"/>
+          </Actors>
+          <Maneuver name="DetectCollision">
+            <Event name="CollisionEvent" maximumExecutionCount="1" priority="parallel">
+              <Action name="SetCollisionVariable">
+                <GlobalAction>
+                  <SetMonitorAction monitorRef="collisionDetected" value="true"/>
+                </GlobalAction>
+              </Action>
+              <StartTrigger>
+                <ConditionGroup>
+                  <Condition name="AtCollision" delay="0" conditionEdge="none">
+                    <ByEntityCondition>
+                      <TriggeringEntities triggeringEntitiesRule="any">
+                        <EntityRef entityRef="Ego"/>
+                      </TriggeringEntities>
+                      <EntityCondition>
+                        <CollisionCondition>
+                          <EntityRef entityRef="Target"/>
+                        </CollisionCondition>
+                      </EntityCondition>
+                    </ByEntityCondition>
+                  </Condition>
+                </ConditionGroup>
+              </StartTrigger>
+            </Event>
+          </Maneuver>
+        </ManeuverGroup>
+        <StartTrigger>
+          <ConditionGroup>
+            <Condition name="SimulationStart" delay="0" conditionEdge="rising">
+              <ByValueCondition>
+                <SimulationTimeCondition value="0" rule="greaterThan"/>
+              </ByValueCondition>
+            </Condition>
+          </ConditionGroup>
+        </StartTrigger>
+      </Act>
+    </Story>
+
+    <StopTrigger>
+      <!-- contact -->
+      <ConditionGroup>
+        <Condition name="StopAfterCollision" delay="2" conditionEdge="none">
+          <ByEntityCondition>
+            <TriggeringEntities triggeringEntitiesRule="any">
+              <EntityRef entityRef="Ego"/>
+            </TriggeringEntities>
+            <EntityCondition>
+              <CollisionCondition><EntityRef entityRef="Target"/></CollisionCondition>
+            </EntityCondition>
+          </ByEntityCondition>
+        </Condition>
+      </ConditionGroup>
+      <!-- GVT has crossed and cleared -->
+      <ConditionGroup>
+        <Condition name="StopTargetCrossed" delay="1" conditionEdge="none">
+          <ByEntityCondition>
+            <TriggeringEntities triggeringEntitiesRule="any">
+              <EntityRef entityRef="Target"/>
+            </TriggeringEntities>
+            <EntityCondition>
+              <TraveledDistanceCondition value="${$_Target_syncS-$_Target_initS+15}"/>
+            </EntityCondition>
+          </ByEntityCondition>
+        </Condition>
+      </ConditionGroup>
+      <!-- absolute timeout so unattended sweeps always terminate -->
+      <ConditionGroup>
+        <Condition name="Timeout" delay="0" conditionEdge="none">
+          <ByValueCondition>
+            <SimulationTimeCondition value="15" rule="greaterThan"/>
+          </ByValueCondition>
+        </Condition>
+      </ConditionGroup>
+    </StopTrigger>
+  </Storyboard>
+</OpenSCENARIO>

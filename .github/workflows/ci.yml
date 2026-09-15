@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    name: Lint & Format Check
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install black flake8 isort
+
+    - name: Check formatting with black
+      run: black --check .
+
+    - name: Check import sorting with isort
+      run: isort --check-only .
+
+    - name: Lint with flake8
+      run: |
+        flake8 scenario_studio dashboard.py --max-line-length=100 --exclude=__pycache__
+
+  test:
+    runs-on: ubuntu-latest
+    name: Tests
+
+    strategy:
+      matrix:
+        python-version: ['3.9', '3.10', '3.11']
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e ".[dev]"
+
+    - name: Run tests
+      run: |
+        pytest --cov=scenario_studio tests/
